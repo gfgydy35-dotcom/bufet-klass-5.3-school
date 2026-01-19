@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Буфет — Инженерная школа Дмитров</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    background: linear-gradient(120deg, #0f2027, #203a43, #2c5364);
+    min-height: 100vh;
+}
+
+header {
+    padding: 20px;
+    text-align: center;
+    color: white;
+}
+
+.container {
+    max-width: 900px;
+    margin: 20px auto;
+    background: white;
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+}
+
+.product {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px;
+    border-radius: 14px;
+    background: #f5f7fa;
+    margin-bottom: 12px;
+    transition: transform 0.2s;
+}
+
+.product:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.product label {
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.product input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+button {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    padding: 12px 18px;
+    border-radius: 14px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: opacity 0.3s;
+    font-weight: 600;
+}
+
+button:hover {
+    opacity: 0.9;
+}
+
+button.secondary {
+    background: linear-gradient(135deg, #4CAF50, #2E7D32);
+}
+
+button.danger {
+    background: linear-gradient(135deg, #ff416c, #ff4b2b);
+}
+
+input, select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    border: 1px solid #ccc;
+    font-size: 15px;
+}
+
+.section {
+    margin-top: 35px;
+    padding-top: 25px;
+    border-top: 2px dashed #e0e0e0;
+}
+
+.seller {
+    display: none;
+}
+
+.order {
+    background: #eef1f7;
+    padding: 14px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+    animation: fadeIn 0.5s;
+}
+
+.order.completed {
+    opacity: 0.6;
+    background: #f0f0f0;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.status-new {
+    background: #ffeb3b;
+    color: #333;
+}
+
+.status-done {
+    background: #4CAF50;
+    color: white;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 📱 ТЕЛЕФОН */
+@media (max-width: 700px) {
+    .container {
+        margin: 10px;
+        padding: 18px;
+    }
+
+    .product {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    button {
+        width: 100%;
+        font-size: 18px;
+    }
+
+    header h1 {
+        font-size: 22px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <h1>🍎 Буфет Инженерной школы г. Дмитрова</h1>
+    <p>Заказ еды по школе</p>
+</header>
+
+<div class="container">
+
+<h2>🏷️ Товары в наличии</h2>
+<div id="products">
+    <p>Загрузка товаров...</p>
+</div>
+
+<div class="section">
+    <h2>🛒 Оформить заказ</h2>
+    <input id="buyer" placeholder="Ваше имя">
+    <input id="floor" placeholder="Этаж (например, 3)" type="number" min="1" max="5">
+    <input id="time" placeholder="Во сколько (например, 12:30)" type="time">
+    <div style="margin: 15px 0; padding: 10px; background: #e8f5e9; border-radius: 10px;">
+        <strong>Выбрано товаров: </strong><span id="selectedCount">0</span>
+    </div>
+    <button onclick="makeOrder()" class="secondary">Отправить заказ</button>
+</div>
+
+<div class="section">
+    <button onclick="loginSeller()">🔐 Вход для продавца</button>
+</div>
+
+<div class="seller" id="sellerPanel">
+    <h2>👨‍🍳 Панель продавца</h2>
+
+    <h3>Добавить новый товар</h3>
+    <input id="pname" placeholder="Название товара">
+    <input id="pprice" type="number" placeholder="Цена" min="0">
+    <button onclick="addProduct()">➕ Добавить товар</button>
+<h3>📋 Активные заказы</h3>
+    <div id="orders">
+        <p>Заказы загружаются...</p>
+    </div>
+    
+    <button onclick="clearCompletedOrders()" class="danger" style="margin-top: 20px;">
+        🗑️ Удалить выполненные заказы
+    </button>
+</div>
+
+</div>
+
+<script>
+const PASSWORD = "252525";
+const MAX_ORDERS = 50; // Ограничение на количество хранимых заказов
+
+let products = JSON.parse(localStorage.getItem("products")) || [
+    { name: "Чай", price: "30" },
+    { name: "Кофе", price: "50" },
+    { name: "Бутерброд", price: "70" },
+    { name: "Пирожок", price: "60" },
+    { name: "Сок", price: "45" }
+];
+
+let orders = JSON.parse(localStorage.getItem("orders")) || [];
+let isSeller = false;
+
+// Инициализация при загрузке
+function init() {
+    save();
+    renderProducts();
+    updateSelectedCount();
+    
+    // Добавляем обработчики для чекбоксов
+    document.addEventListener('change', function(e) {
+        if (e.target.type === 'checkbox') {
+            updateSelectedCount();
+        }
+    });
+}
+
+function save() {
+    localStorage.setItem("products", JSON.stringify(products));
+    
+    // Храним только последние MAX_ORDERS заказов
+    if (orders.length > MAX_ORDERS) {
+        orders = orders.slice(orders.length - MAX_ORDERS);
+    }
+    localStorage.setItem("orders", JSON.stringify(orders));
+}
+
+function renderProducts() {
+    const el = document.getElementById("products");
+    
+    if (products.length === 0) {
+        el.innerHTML = "<p>Товаров пока нет</p>";
+        return;
+    }
+
+    let html = '';
+    products.forEach((p, i) => {
+        html += `
+        <div class="product">
+            <label>
+                <input type="checkbox" value="${p.name}" data-price="${p.price}">
+                ${p.name} — <strong>${p.price} ₽</strong>
+            </label>
+            ${isSeller ? `<button onclick="deleteProduct(${i})" class="danger">Удалить</button>` : ``}
+        </div>`;
+    });
+    el.innerHTML = html;
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('input[type="checkbox"]:checked').length;
+    document.getElementById('selectedCount').textContent = selected;
+}
+
+function addProduct() {
+    const name = document.getElementById("pname").value.trim();
+    const price = document.getElementById("pprice").value;
+
+    if (!name || !price) {
+        alert("Заполните все поля");
+        return;
+    }
+
+    if (price < 0) {
+        alert("Цена не может быть отрицательной");
+        return;
+    }
+
+    products.push({ name, price });
+    save();
+    renderProducts();
+    document.getElementById("pname").value = "";
+    document.getElementById("pprice").value = "";
+}
+
+function deleteProduct(i) {
+    if (confirm("Удалить этот товар?")) {
+        products.splice(i, 1);
+        save();
+        renderProducts();
+    }
+}
+
+function makeOrder() {
+    const buyer = document.getElementById("buyer").value.trim();
+    const floor = document.getElementById("floor").value.trim();
+    const time = document.getElementById("time").value;
+
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+    const items = Array.from(checkboxes).map(cb => cb.value);
+    const totalPrice = Array.from(checkboxes).reduce((sum, cb) => sum + parseInt(cb.dataset.price || 0), 0);
+
+    if (!buyer || !floor || !time || items.length === 0) {
+        alert("Заполните все поля и выберите хотя бы один товар");
+        return;
+    }
+
+    const order = {
+        id: Date.now(),
+        buyer: buyer,
+        floor: floor,
+        time: time,
+        items: items,
+        total: totalPrice,
+        status: 'new',
+        createdAt: new Date().toLocaleString('ru-RU')
+    };
+
+    orders.push(order);
+    save();
+    
+    // Показываем подтверждение
+    const confirmation = `
+    ✅ Заказ принят!
+    
+    Имя: ${buyer}
+    Этаж: ${floor}
+    Время: ${time}
+    Товары: ${items.join(', ')}
+    Сумма: ${totalPrice} ₽
+    
+    Спасибо за заказ!`;
+    
+    alert(confirmation);
+
+    // Сбрасываем форму
+document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+    document.getElementById("buyer").value = "";
+    document.getElementById("floor").value = "";
+    document.getElementById("time").value = "";
+    updateSelectedCount();
+    
+    // Обновляем список заказов если продавец авторизован
+    if (isSeller) {
+        renderOrders();
+    }
+}
+
+function loginSeller() {
+    const password = prompt("Введите пароль продавца:");
+    if (password === PASSWORD) {
+        isSeller = true;
+        document.getElementById("sellerPanel").style.display = "block";
+        renderProducts();
+        renderOrders();
+        alert("Добро пожаловать в панель продавца!");
+    } else {
+        alert("Неверный пароль");
+    }
+}
+
+function renderOrders() {
+    const el = document.getElementById("orders");
+    
+    if (orders.length === 0) {
+        el.innerHTML = "<p>Заказов нет</p>";
+        return;
+    }
+
+    // Сортируем заказы: новые сверху
+    const sortedOrders = [...orders].sort((a, b) => {
+        if (a.status === b.status) return b.id - a.id;
+        return a.status === 'new' ? -1 : 1;
+    });
+
+    let html = '';
+    sortedOrders.forEach(order => {
+        const statusText = order.status === 'new' ? 'Новый' : 'Выполнен';
+        const statusClass = order.status === 'new' ? 'status-new' : 'status-done';
+        const orderClass = order.status === 'done' ? 'order completed' : 'order';
+        
+        html += `
+        <div class="${orderClass}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <b>${order.buyer}</b>
+                    <span class="status-badge ${statusClass}">${statusText}</span>
+                </div>
+                <div style="font-size: 14px; color: #666;">
+                    ${order.createdAt}
+                </div>
+            </div>
+            <div style="margin-top: 8px;">
+                Этаж: ${order.floor} | Время: ${order.time}<br>
+                Товары: ${order.items.join(", ")}<br>
+                <strong>Сумма: ${order.total} ₽</strong>
+            </div>
+            ${order.status === 'new' ? 
+                `<button onclick="completeOrder(${order.id})" style="margin-top: 10px; padding: 6px 12px; font-size: 14px;">
+                    ✅ Отметить выполненным
+                </button>` : ''
+            }
+        </div>`;
+    });
+    el.innerHTML = html;
+}
+
+function completeOrder(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+        order.status = 'done';
+        save();
+        renderOrders();
+    }
+}
+
+function clearCompletedOrders() {
+    if (confirm("Удалить все выполненные заказы?")) {
+        orders = orders.filter(order => order.status !== 'done');
+        save();
+        renderOrders();
+    }
+}
+
+// Запускаем при загрузке
+init();
+</script>
+
+</body>
+</html>
